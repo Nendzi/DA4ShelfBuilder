@@ -1,0 +1,8 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Addin Type="Plugin">
+  <ClassId>{2341203d-8527-47ee-882b-c4cc2bf871a4}</ClassId>
+  <ClientId>{2341203d-8527-47ee-882b-c4cc2bf871a4}</ClientId>
+  <DisplayName>DA4ShelfBuilderPlugin</DisplayName>
+  <Description>a DA4ShelfBuilderPlugin</Description>
+  <Assembly>DA4ShelfBuilderPlugin.dll</Assembly>
+</Addin>
