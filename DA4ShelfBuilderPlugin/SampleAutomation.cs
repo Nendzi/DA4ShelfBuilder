@@ -38,7 +38,27 @@ namespace DA4ShelfBuilderPlugin
 
         public void Run(Document doc)
         {
-            LogTrace("Run called with {0}", doc.DisplayName);
+            LogTrace("Run me called with {0}", doc.DisplayName);
+            LogTrace("asd");
+
+            if (doc.DocumentType == DocumentTypeEnum.kPartDocumentObject)
+            {
+                using (new HeartBeat())
+                {
+                    // TODO: handle the Inventor part here
+                }
+            }
+            else if (doc.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject) // Assembly.
+            {
+                
+                using (new HeartBeat())
+                {
+                    //GetOnDemandFile("onProgress", "", "", "{'id': 'post test', 'value': 'something'}", null);
+                    
+                    WallShelfCreator WSC = new WallShelfCreator(doc as AssemblyDocument, inventorApplication);
+                    WSC.Entry();
+                }
+            }
         }
 
         public void RunWithArguments(Document doc, NameValueMap map)
@@ -75,7 +95,8 @@ namespace DA4ShelfBuilderPlugin
                 {
                     using (new HeartBeat())
                     {
-                        // TODO: handle the Inventor assembly here
+                        WallShelfCreator WSC = new WallShelfCreator(doc as AssemblyDocument, inventorApplication);
+                        WSC.Entry();
                     }
                 }
             }
@@ -86,6 +107,27 @@ namespace DA4ShelfBuilderPlugin
         }
 
         #region Logging utilities
+
+        /// <summary>
+        /// Call ACESAPI to get response from Forge server
+        /// </summary>
+        /// <param name="name">name of the onDemand input parameter as specified in the Activity</param>
+        /// <param name="suffix">a query string - optional parameters that can be addded to the url defined in the WorkItem</param>
+        /// <param name="headers">http call headers</param>
+        /// <param name="data">name of file to save the response to</param>
+        /// <param name="responseFile">name of file to save the response to or null</param>
+        public static void GetOnDemandFile(string name, 
+                                           string suffix, 
+                                           string headers, 
+                                           string data, 
+                                           string responseFile)
+        {
+            LogTrace("Sending a POST request");
+            LogTrace("!ACESAPI:acesHttpOperation({0},{1},{2},{3},{4})",
+            name ?? "", suffix ?? "", headers ?? "", data ?? "", responseFile);
+            LogTrace("Log after ACESAPI");
+
+        }
 
         /// <summary>
         /// Log message with 'trace' log level.

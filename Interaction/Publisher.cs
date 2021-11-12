@@ -1,6 +1,8 @@
-﻿using Autodesk.Forge.Core;
+﻿using Autodesk.Forge;
+using Autodesk.Forge.Core;
 using Autodesk.Forge.DesignAutomation;
 using Autodesk.Forge.DesignAutomation.Model;
+using Autodesk.Forge.Model;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using System;
@@ -19,6 +21,12 @@ namespace Interaction
 
         internal DesignAutomationClient Client { get; }
         private static string PackagePathname { get; set; }
+        private static string DataSet { get; set; }
+        private static string ObjectName { get; set; }
+        private static string BucketKey { get; set; }
+        private static string ParamFile { get; set; }
+        private static string ResultFile { get; set; }
+        private static string ResultDest { get; set; }
 
         /// <summary>
         /// Constructor.
@@ -28,6 +36,12 @@ namespace Interaction
         {
             Client = CreateDesignAutomationClient(configuration);
             PackagePathname = configuration.GetValue<string>("PackagePathname");
+            DataSet = configuration.GetValue<string>("DataSet");
+            ObjectName = configuration.GetValue<string>("ObjectName");
+            BucketKey = configuration.GetValue<string>("BucketKey");
+            ParamFile = configuration.GetValue<string>("ParamFile");
+            ResultFile = configuration.GetValue<string>("ResultFile");
+            ResultDest = configuration.GetValue<string>("ResultDest");
         }
 
         /// <summary>
@@ -55,7 +69,6 @@ namespace Interaction
                 }
             } while (page != null);
         }
-
         public async Task PostAppBundleAsync()
         {
             if (!File.Exists(PackagePathname))
@@ -77,56 +90,6 @@ namespace Interaction
                 Console.WriteLine($"Created version #{version} for '{shortAppBundleId}' app bundle.");
             }
         }
-
-        public async Task RunWorkItemAsync()
-        {
-            // create work item
-            var wi = new WorkItem
-            {
-                ActivityId = await GetFullActivityId(),
-                Arguments = GetWorkItemArgs()
-            };
-
-            // run WI and wait for completion
-            var status = await Client.CreateWorkItemAsync(wi);
-            Console.WriteLine($"Created WI {status.Id}");
-            while (status.Status == Status.Pending || status.Status == Status.Inprogress)
-            {
-                Console.Write(".");
-                Thread.Sleep(2000);
-                status = await Client.GetWorkitemStatusAsync(status.Id);
-            }
-
-            Console.WriteLine();
-            Console.WriteLine($"WI {status.Id} completed with {status.Status}");
-            Console.WriteLine();
-
-            // dump report
-            var client = new HttpClient();
-            var report = await client.GetStringAsync(status.ReportUrl);
-            var oldColor = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.Write(report);
-            Console.ForegroundColor = oldColor;
-            Console.WriteLine();
-        }
-
-        private async Task<string> GetFullActivityId()
-        {
-            string nickname = await GetNicknameAsync();
-            return $"{nickname}.{Constants.Activity.Id}+{Constants.Activity.Label}";
-        }
-
-        public async Task<string> GetNicknameAsync()
-        {
-            if (_nickname == null)
-            {
-                _nickname = await Client.GetNicknameAsync("me");
-            }
-
-            return _nickname;
-        }
-
         public async Task PublishActivityAsync()
         {
             var nickname = await GetNicknameAsync();
@@ -157,7 +120,92 @@ namespace Interaction
                 Console.WriteLine($"Created version #{version} for '{Constants.Activity.Id}' activity.");
             }
         }
+        public async Task UploadDataSetAsync()
+        {
+            dynamic oauth = await OAuthenticationController.GetInternalAsync();
+            var nickname = await GetNicknameAsync();
 
+            BucketsApi buckets = new BucketsApi();
+            buckets.Configuration.AccessToken = oauth.access_token;
+
+            string bucketKey = nickname.ToLower() + BucketKey;
+
+            try
+            {
+                var postBuckets = new PostBucketsPayload(bucketKey, null, PostBucketsPayload.PolicyKeyEnum.Transient);
+                dynamic result = buckets.CreateBucket(postBuckets);
+            }
+            catch (Exception)
+            {
+
+            }
+
+            ObjectsApi objects = new ObjectsApi();
+            objects.Configuration.AccessToken = oauth.access_token;
+            var objectName = ObjectName;
+            var contentLength = 56;
+            System.IO.Stream body = File.OpenRead(DataSet);
+
+            try
+            {
+                var result = objects.UploadObject(bucketKey, objectName, contentLength, body, "application/octet-stream");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error during uploading data set " + e.Message);
+            }
+        }
+        public async Task RunWorkItemAsync()
+        {
+            dynamic oauth = await OAuthenticationController.GetInternalAsync();
+            var nickname = await GetNicknameAsync();
+
+            string bucketKey = nickname.ToLower() + BucketKey;
+
+            // create work item
+            var wi = new WorkItem
+            {
+                ActivityId = await GetFullActivityId(),
+                Arguments = GetWorkItemArgs(bucketKey, ObjectName, ParamFile, ResultFile, oauth.access_token)
+            };
+
+            // run WI and wait for completion
+            var status = await Client.CreateWorkItemAsync(wi);
+            Console.WriteLine($"Created WI {status.Id}");
+            while (status.Status == Status.Pending || status.Status == Status.Inprogress)
+            {
+                Console.Write(".");
+                Thread.Sleep(2000);
+                status = await Client.GetWorkitemStatusAsync(status.Id);
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"WI {status.Id} completed with {status.Status}");
+            Console.WriteLine();
+
+            // dump report
+            var client = new HttpClient();
+            var report = await client.GetStringAsync(status.ReportUrl);
+            var oldColor = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.Write(report);
+            Console.ForegroundColor = oldColor;
+            Console.WriteLine();
+        }
+        private async Task<string> GetFullActivityId()
+        {
+            string nickname = await GetNicknameAsync();
+            return $"{nickname}.{Constants.Activity.Id}+{Constants.Activity.Label}";
+        }
+        public async Task<string> GetNicknameAsync()
+        {
+            if (_nickname == null)
+            {
+                _nickname = await Client.GetNicknameAsync("me");
+            }
+
+            return _nickname;
+        }
         public async Task CleanExistingAppActivityAsync()
         {
             var bundleId = Constants.Bundle.Id;
@@ -191,8 +239,6 @@ namespace Interaction
                 Console.WriteLine($"The activity {activityId} does not exist.");
             }
         }
-
-
         private static DesignAutomationClient CreateDesignAutomationClient(IConfiguration configuration)
         {
             var forgeService = CreateForgeService(configuration);
@@ -201,7 +247,6 @@ namespace Interaction
             var options = (rsdkCfg == null) ? null : Options.Create(rsdkCfg);
             return new DesignAutomationClient(forgeService, options);
         }
-
         private static ForgeService CreateForgeService(IConfiguration configuration)
         {
             var forgeCfg = configuration.GetSection("Forge").Get<ForgeConfiguration>();

@@ -6,7 +6,7 @@ namespace DebugPluginLocally
 {
     class Program
     {
-        static void Main(string[] args)
+        static void Main()
         {
             using (var inv = new InventorConnector())
             {
@@ -43,18 +43,21 @@ namespace DebugPluginLocally
         /// <param name="app"></param>
         private static void DebugSamplePlugin(InventorServer app)
         {
+            // basic part
+            string componentSample = "MyWallShelf.iam";
+
             // get project directory
             string projectdir = Directory.GetParent(Directory.GetCurrentDirectory()).Parent.FullName;
 
             // get box.ipt absolute path
-            string boxPath = System.IO.Path.Combine(projectdir, @"inputFiles\", "box.ipt");
+            string componentPath = System.IO.Path.Combine(projectdir, @"inputFiles\", componentSample);
 
-            string boxPathCopy = System.IO.Path.Combine(projectdir, @"inputFiles\", "boxcopy.ipt");
+            string componentPathCopy = System.IO.Path.Combine(projectdir, @"inputFiles\", "CopyOf" + componentSample);
 
             try
             {
                 // delete an existing file
-                System.IO.File.Delete(boxPathCopy);
+                System.IO.File.Delete(componentPathCopy);
             }
             catch (IOException)
             {
@@ -63,10 +66,10 @@ namespace DebugPluginLocally
             }
 
             // create a copy
-            System.IO.File.Copy(boxPath, boxPathCopy);
+            System.IO.File.Copy(componentPath, componentPathCopy);
 
             // open box.ipt by Inventor
-            Document doc = app.Documents.Open(boxPathCopy);
+            Document doc = app.Documents.Open(componentPath);
 
             // get params.json absolute path
             string paramsPath = System.IO.Path.Combine(projectdir, @"inputFiles\", "params.json");
